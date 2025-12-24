@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X20 GPS Tracker 3D Model</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #f0f2f5;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        #info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            pointer-events: none;
+        }
+        h1 { margin: 0; font-size: 18px; color: #333; }
+        p { margin: 5px 0 0; font-size: 13px; color: #666; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+
+    <div id="info-panel">
+        <h1>X20 SOS GPS Tracker</h1>
+        <p>Mouse diye ghuriye protiti dik dekhun</p>
+    </div>
+
+    <script>
+        let scene, camera, renderer, deviceGroup;
+        let isMouseDown = false;
+        let mouseX = 0, mouseY = 0;
+        let targetRotationX = 0.2, targetRotationY = -0.5;
+        let currentRotationX = 0.2, currentRotationY = -0.5;
+
+        function createTextTexture(text, subText) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 512;
+            canvas.height = 256;
+
+            // Background transparent rakha hoyechhe
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // X20 Text
+            ctx.fillStyle = '#444444';
+            ctx.font = 'bold 120px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(text, 256, 120);
+
+            // Made by Joy Text
+            if(subText) {
+                ctx.fillStyle = '#888888';
+                ctx.font = 'italic 40px Arial';
+                ctx.fillText(subText, 256, 200);
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            return texture;
+        }
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf0f2f5);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 8;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.body.appendChild(renderer.domElement);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            const directLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directLight.position.set(5, 10, 7);
+            scene.add(directLight);
+
+            deviceGroup = new THREE.Group();
+
+            // 1. Main Body (White Plastic)
+            const bodyGeo = new THREE.BoxGeometry(2.5, 3.8, 0.8);
+            const bodyMat = new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 80 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            deviceGroup.add(body);
+
+            // 2. Side Frame (Grey/Rubberized look)
+            const frameGeo = new THREE.BoxGeometry(2.6, 3.9, 0.4);
+            const frameMat = new THREE.MeshPhongMaterial({ color: 0x7f8c8d });
+            const frame = new THREE.Mesh(frameGeo, frameMat);
+            frame.position.z = -0.1;
+            deviceGroup.add(frame);
+
+            // 3. SOS Button (Orange)
+            const btnGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.15, 32);
+            const btnMat = new THREE.MeshPhongMaterial({ color: 0xff6600 });
+            const sosBtn = new THREE.Mesh(btnGeo, btnMat);
+            sosBtn.rotation.x = Math.PI / 2;
+            sosBtn.position.z = 0.45;
+            sosBtn.position.y = -0.4;
+            deviceGroup.add(sosBtn);
+
+            // 4. LED Indicators (Green, Blue, Red)
+            const ledGeo = new THREE.CircleGeometry(0.06, 16);
+            const colors = [0x2ecc71, 0x3498db, 0xe74c3c];
+            colors.forEach((col, i) => {
+                const led = new THREE.Mesh(ledGeo, new THREE.MeshBasicMaterial({ color: col }));
+                led.position.set(-0.6 + (i * 0.6), 1.5, 0.41);
+                deviceGroup.add(led);
+            });
+
+            // 5. "X20" and "Made by Joy" Text Branding
+            const brandingTexture = createTextTexture("X20", "Made by Joy");
+            const brandingGeo = new THREE.PlaneGeometry(2, 1);
+            const brandingMat = new THREE.MeshBasicMaterial({ 
+                map: brandingTexture, 
+                transparent: true 
+            });
+            const brandingMesh = new THREE.Mesh(brandingGeo, brandingMat);
+            brandingMesh.position.set(0, 0.6, 0.41);
+            deviceGroup.add(brandingMesh);
+
+            // 6. QR Code Placeholder (Back side)
+            const qrGeo = new THREE.PlaneGeometry(1.2, 1.2);
+            const qrMat = new THREE.MeshBasicMaterial({ color: 0x333333 });
+            const qrMesh = new THREE.Mesh(qrGeo, qrMat);
+            qrMesh.rotation.y = Math.PI;
+            qrMesh.position.z = -0.51;
+            qrMesh.position.y = 0.5;
+            deviceGroup.add(qrMesh);
+
+            // 7. Lanyard Loop (Top)
+            const loopGeo = new THREE.TorusGeometry(0.3, 0.08, 16, 100, Math.PI);
+            const loopMat = new THREE.MeshPhongMaterial({ color: 0x7f8c8d });
+            const loop = new THREE.Mesh(loopGeo, loopMat);
+            loop.position.y = 1.9;
+            deviceGroup.add(loop);
+
+            scene.add(deviceGroup);
+
+            // Listeners
+            window.addEventListener('resize', onResize);
+            document.addEventListener('mousedown', () => isMouseDown = true);
+            document.addEventListener('mouseup', () => isMouseDown = false);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('wheel', (e) => {
+                camera.position.z += e.deltaY * 0.01;
+                camera.position.z = Math.max(3, Math.min(15, camera.position.z));
+            });
+        }
+
+        function onMouseMove(e) {
+            if (isMouseDown) {
+                targetRotationY += e.movementX * 0.01;
+                targetRotationX += e.movementY * 0.01;
+            }
+        }
+
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            currentRotationX += (targetRotationX - currentRotationX) * 0.1;
+            currentRotationY += (targetRotationY - currentRotationY) * 0.1;
+            deviceGroup.rotation.x = currentRotationX;
+            deviceGroup.rotation.y = currentRotationY;
+            renderer.render(scene, camera);
+        } 
+        // joy
+
+        window.onload = () => { init(); animate(); };
+    </script>
+</body>
+</html>
